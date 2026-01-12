@@ -1,0 +1,53 @@
+name: Darwin Build
+
+on:
+  push:
+    branches:
+      - build-darwin
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: short
+  CARGO_REGISTRIES_CRATES_IO_PROTOCOL: sparse
+  SEGMENT_DOWNLOAD_TIMEOUT_MINS: 1
+  CARGO_PROFILE_DEV_DEBUG: 0
+
+jobs:
+  build-darwin:
+    name: Build Darwin [${{ matrix.arch }}]
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: macos-latest
+            target: x86_64-apple-darwin
+          - arch: aarch64
+            runner: macos-latest
+            target: aarch64-apple-darwin
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2.7.3
+
+      - name: Build ironrdp-client
+        run: cargo build --release --package ironrdp-client --target ${{ matrix.target }}
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ironrdp-client-darwin-${{ matrix.arch }}
+          path: target/${{ matrix.target }}/release/ironrdp-client
+          if-no-files-found: error
